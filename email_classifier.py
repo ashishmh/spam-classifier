@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
+from nltk.stem.snowball import EnglishStemmer
 
 import nearest_neighbor as nn
 
@@ -52,10 +53,15 @@ def main():
     train_ham_data, train_spam_data = read_data(0, TRAINING_HAM, 0, TRAINING_SPAM)
     test_ham_data, test_spam_data = read_data(TRAINING_HAM, MAX_HAM, TRAINING_SPAM, MAX_SPAM)
 
-    vectorizer = CountVectorizer()
+    # create stemmer for vectorizer
+    stemmer = EnglishStemmer()
+    analyzer = CountVectorizer().build_analyzer()
+    def stemmed_words(doc):
+        return (stemmer.stem(w) for w in analyzer(doc))
+    vectorizer = CountVectorizer(analyzer=stemmed_words, min_df=5)
     # create vocab and encode training document
     train_vector = vectorizer.fit_transform(train_ham_data + train_spam_data)
-    print("\nvocab length: ", len(vectorizer.vocabulary_))
+    print("\nVocab Length: ", len(vectorizer.vocabulary_), "\n")
     # encode test document
     test_vector = vectorizer.transform(test_ham_data + test_spam_data)
 
@@ -67,7 +73,7 @@ def main():
     test_arr_label = add_class_labels(len(test_arr), len(test_ham_data), len(test_spam_data))
 
     # run nearest neighbor L1 classifier
-    nn.nearest_neighbor_l1(train_arr, train_arr_label, test_arr, test_arr_label)
+    nn.main(train_arr, train_arr_label, test_arr, test_arr_label)
 
 
 if __name__ == "__main__":
