@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
+from nltk.stem.snowball import EnglishStemmer
 
 import nearest_neighbor as nn
 
@@ -30,6 +31,7 @@ def read_data(ham_beg, ham_end, spam_beg, spam_end):
         try:
             content = open(SPAM_FOLDER + file).read()
         except:
+            print(file)
             pass
         spam_data.append(content)
 
@@ -46,13 +48,18 @@ def add_class_labels(total_num, ham_num, spam_num):
 
     return arr_label
 
+stemmer = EnglishStemmer()
+analyzer = CountVectorizer().build_analyzer()
+
+def stemmed_words(doc):
+    return (stemmer.stem(w) for w in analyzer(doc))
 
 def main():
     # read data and split into training and test sets
     train_ham_data, train_spam_data = read_data(0, TRAINING_HAM, 0, TRAINING_SPAM)
     test_ham_data, test_spam_data = read_data(TRAINING_HAM, MAX_HAM, TRAINING_SPAM, MAX_SPAM)
 
-    vectorizer = CountVectorizer()
+    vectorizer = CountVectorizer(analyzer=stemmed_words, min_df=5)
     # create vocab and encode training document
     train_vector = vectorizer.fit_transform(train_ham_data + train_spam_data)
     print("\nvocab length: ", len(vectorizer.vocabulary_))
