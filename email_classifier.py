@@ -62,7 +62,7 @@ def main():
     vectorizer = CountVectorizer(analyzer=stemmed_words, min_df=5)
     # create vocab and encode training document
     train_vector = vectorizer.fit_transform(train_ham_data + train_spam_data)
-    print("\nvocab length: ", len(vectorizer.vocabulary_))
+    print("\nVocab Length: ", len(vectorizer.vocabulary_), "\n")
     # encode test document
     test_vector = vectorizer.transform(test_ham_data + test_spam_data)
 
@@ -74,7 +74,7 @@ def main():
     test_arr_label = add_class_labels(len(test_arr), len(test_ham_data), len(test_spam_data))
 
     # run nearest neighbor L1 classifier
-    nn.nearest_neighbor_l1(train_arr, train_arr_label, test_arr, test_arr_label)
+    nn.main(train_arr, train_arr_label, test_arr, test_arr_label)
 
 
 if __name__ == "__main__":
