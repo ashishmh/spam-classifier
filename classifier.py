@@ -209,6 +209,129 @@ class Classifier:
                            predicted_label_linf.flatten()]
         print('testing took %.2f s' % (time.time() - start_time))
         return self.result
+    
+    def decision_tree(self, f_train = None):
+        if f_train is not None:
+            # re-vectorize the data
+            self.vectorize(f_train)
+        
+        SPLIT = 30
+        
+        training_ham = self.get_ham(self.training_X, self.training_label)
+        training_spam = self.get_spam(self.training_X, self.training_label)
+
+        hmean = training_ham.mean(axis = 0)
+        smean = training_spam.mean(axis = 0)
+
+        freq_diff = abs(hmean - smean) # difference of each word freq in ham ans spam
+        arg_fdiff = np.flip(np.argsort(freq_diff)) # arg of freq difference in descending order
+        arg_list = list(arg_fdiff[np.where(freq_diff > 0)]) # list of indexes where we do the cuts
+
+        class Node:
+            def __init__(self, idx):
+                self.idx = idx
+#                 print('a new node at index %d' % self.idx)
+                self.value = None
+                self.left = None
+                self.right = None
+
+        def get_idx():
+            if arg_list:
+                idx = arg_list[0]
+                arg_list.pop(0)
+                return idx
+            else:
+                print('Reached maximum number of nodes')
+                return None
+
+        def build_tree(rows):
+            if np.size(rows) == 1:
+                node_labels = self.training_label[rows]
+                return node_labels
+            else:
+                new_N = Node(get_idx())
+                col = self.training_X[:, new_N.idx] # the column turned into array
+                node_col = col[rows]
+                node_labels = self.training_label[rows]
+
+                new_N.value = Gini_min(node_col, node_labels) # node value is whatever with lowest gini index
+                l_rows = rows[np.where(node_col <= new_N.value)] # cut rows by N.value
+                r_rows = rows[np.where(node_col > new_N.value)]
+                if np.size(l_rows) == 0:
+                    if np.count_nonzero(self.training_label[r_rows] ==self.HAM) / np.size(self.training_label[r_rows]) > 0.5: # fraction ofself.HAM is higher
+                        new_N.right =self.HAM
+                        new_N.left =self.SPAM
+                    else:
+                        new_N.right =self.SPAM
+                        new_N.left =self.HAM
+                    return new_N    
+                elif np.size(r_rows) == 0: # if one side has no other data
+                    if np.count_nonzero(self.training_label[l_rows] ==self.HAM) / np.size(self.training_label[l_rows]) > 0.5: # fraction ofself.HAM is higher
+                        new_N.right =self.SPAM
+                        new_N.left =self.HAM
+                    else:
+                        new_N.right =self.HAM
+                        new_N.left =self.SPAM
+                    return new_N    
+                else:
+                    new_N.left = build_tree(l_rows)
+                    new_N.right = build_tree(r_rows)
+                    return new_N
+
+        def Gini_min(col, c):
+            '''return the minimum gini index given an array of word freq and associated label c'''
+            # look for the lowest gini value in the column
+            c_max = np.max(col) # the largest value
+            c_min = np.min(col) # the smallest value/freq in column
+            if c_max == c_min: # if the maximun equals the minimum -> all values are equal
+                return c_max # that's the value to split
+            else: # if not all elements are zero
+                split_value = np.linspace(c_min, c_max, num = SPLIT) # the values of diff split
+                gini_idx = Gini_index(split_value, col, c) # list of gini idx at diff split
+                return gini_idx.argmin() # return the value for minimum gini index
+
+        # Calculate the Gini index for a split dataset
+        def Gini_index(cut, col, c):
+            lc = c[np.where(col <= cut)] # labels for the left
+            rc = c[np.where(col > cut)] # labels for the right
+
+            len_left, len_right = len(lc), len(rc)
+            len_total = len_left + len_right
+
+            unc = 0.0
+            if len_left == 0:
+                unc += 0 # weighted uncertainty
+            else:
+                l_p_ham = (np.count_nonzero(lc ==self.HAM) / np.size(lc))
+                l_p_spam = (np.count_nonzero(lc ==self.SPAM) / np.size(lc))
+                unc += (1 - (l_p_ham**2 + l_p_spam**2)) * len_left / len_total
+
+            if len_right == 0:
+                unc += 0
+            else:
+                r_p_ham = (np.count_nonzero(rc ==self.HAM) / np.size(rc))
+                r_p_spam = (np.count_nonzero(rc ==self.SPAM) / np.size(rc))
+                unc += (1 - (r_p_ham**2 + r_p_spam**2)) * len_right / len_total
+
+            return unc
+        Gini_index = np.vectorize(Gini_index, excluded = [1, 2])
+        
+        def classify(case, N):
+            if N == self.HAM:
+                return self.HAM
+            elif N == self.SPAM:
+                return self.SPAM
+            else:
+                if case[N.idx] < N.value:
+                    return classify(case, N.left)
+                else:
+                    return classify(case, N.right)
+            
+        root = build_tree(np.arange(self.training_X.shape[0]))
+        self.result = np.empty(self.N_TESTING.sum())
+        for i in np.arange(np.size(self.testing_label)):
+            self.result[i] = classify(self.testing_X[i], root)
+        return self.result
 
 # How to use the classifier:
 # Example: 
